@@ -854,7 +854,7 @@ def _string_to_length_and_void_p(string):
 
 def _length_and_void_p_to_string(length, void_p):
     char_p = ctypes.cast(void_p, ctypes.POINTER(ctypes.c_char))
-    return ''.join(char_p[i] for i in xrange(length))
+    return ''.join(char_p[i].decode('utf-8') for i in range(length))
 
 
 
@@ -1104,6 +1104,16 @@ def DNSServiceRegister(
     _NO_DEFAULT.check(port)
 
     port = socket.htons(port)
+
+    # From here on txtRecord has to be a bytes type, so convert what
+    # we have:
+    if type(txtRecord) == TXTRecord:
+        txtRecord = str(txtRecord).encode('utf-8')
+    elif type(txtRecord) == str:
+        txtRecord = txtRecord.encode('utf-8')
+    else:
+        raise TypeError('txtRecord is unhandlable type: {type}'.format(
+            type=type(txtRecord)))
 
     if not txtRecord:
         txtLen, txtRecord = 1, '\0'
@@ -1941,7 +1951,7 @@ class TXTRecord(object):
         self._names = []
         self._items = {}
 
-        for name, value in items.iteritems():
+        for name, value in items.items():
             self[name] = value
 
     def __contains__(self, name):
