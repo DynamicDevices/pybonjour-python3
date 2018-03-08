@@ -29,21 +29,14 @@
 
 
 from distutils.core import setup
-import pybonjour
-
-
-# Grab the description from the package's doc string
-desc = pybonjour.__doc__.strip().split('\n\n')
 
 
 setup(
     name = 'pybonjour',
-    version = pybonjour.__version__,
+    version = '1.1.1',
     author = 'Christopher Stawarz',
     author_email = 'cstawarz@csail.mit.edu',
     url = 'http://o2s.csail.mit.edu/o2s-wiki/pybonjour',
-    description = desc[0].strip(),
-    long_description = desc[1].strip(),
     download_url = 'http://o2s.csail.mit.edu/download/pybonjour/',
     classifiers = [
         'Development Status :: 5 - Production/Stable',
