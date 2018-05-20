@@ -852,9 +852,9 @@ def _string_to_length_and_void_p(string):
     return len(string), void_p
 
 
-def _length_and_void_p_to_string(length, void_p):
+def _length_and_void_p_to_byte(length, void_p):
     char_p = ctypes.cast(void_p, ctypes.POINTER(ctypes.c_char))
-    return ''.join(char_p[i].decode('utf-8') for i in range(length))
+    return b''.join(char_p[i] for i in range(length))
 
 
 
@@ -1529,9 +1529,9 @@ def DNSServiceResolve(
                   port, txtLen, txtRecord, context):
         if callBack is not None:
             port = socket.ntohs(port)
-            txtRecord = _length_and_void_p_to_string(txtLen, txtRecord)
+            txtRecord = _length_and_void_p_to_byte(txtLen, txtRecord)
             callBack(sdRef, flags, interfaceIndex, errorCode, fullname.decode(),
-                     hosttarget.decode(), port, txtRecord)
+                     hosttarget.decode(), port, txtRecord.decode())
 
     _global_lock.acquire()
     try:
@@ -1782,7 +1782,7 @@ def DNSServiceQueryRecord(
     def _callback(sdRef, flags, interfaceIndex, errorCode, fullname, rrtype,
                   rrclass, rdlen, rdata, ttl, context):
         if callBack is not None:
-            rdata = _length_and_void_p_to_string(rdlen, rdata)
+            rdata = _length_and_void_p_to_byte(rdlen, rdata)
             callBack(sdRef, flags, interfaceIndex, errorCode, fullname.decode(),
                      rrtype, rrclass, rdata, ttl)
 
