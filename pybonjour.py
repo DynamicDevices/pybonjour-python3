@@ -225,6 +225,7 @@ kDNSServiceErr_NoSuchKey            = -65556
 kDNSServiceErr_NATTraversal         = -65557
 kDNSServiceErr_DoubleNAT            = -65558
 kDNSServiceErr_BadTime              = -65559
+kDNSServiceErr_ServiceNotRunning    = -65563
 
 
 #
