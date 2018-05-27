@@ -32,13 +32,13 @@ from distutils.core import setup
 
 
 setup(
-    name = 'pybonjour',
-    version = '1.1.1',
-    author = 'Christopher Stawarz',
-    author_email = 'cstawarz@csail.mit.edu',
-    url = 'http://o2s.csail.mit.edu/o2s-wiki/pybonjour',
-    download_url = 'http://o2s.csail.mit.edu/download/pybonjour/',
-    classifiers = [
+    name='pybonjour',
+    version='1.1.2',
+    author='Christopher Stawarz',
+    author_email='cstawarz@csail.mit.edu',
+    url='http://o2s.csail.mit.edu/o2s-wiki/pybonjour',
+    download_url='http://o2s.csail.mit.edu/download/pybonjour/',
+    classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
@@ -49,5 +49,5 @@ setup(
         'Topic :: System :: Distributed Computing',
         'Topic :: System :: Networking',
         ],
-    py_modules = ['pybonjour'],
+    py_modules=['pybonjour'],
     )
