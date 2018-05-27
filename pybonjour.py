@@ -848,7 +848,7 @@ _NO_DEFAULT = _NoDefault()
 
 def _string_to_length_and_void_p(string):
     if isinstance(string, TXTRecord):
-        string = str(string).encode('utf-8')
+        string = string.wireformat
     void_p = ctypes.cast(ctypes.c_char_p(string), ctypes.c_void_p)
     return len(string), void_p
 
@@ -1108,11 +1108,9 @@ def DNSServiceRegister(
 
     # From here on txtRecord has to be a bytes type, so convert what
     # we have:
-    if type(txtRecord) == TXTRecord:
-        txtRecord = str(txtRecord).encode('utf-8')
-    elif type(txtRecord) == str:
-        txtRecord = txtRecord.encode('utf-8')
-    else:
+    if isinstance(txtRecord, TXTRecord):
+        txtRecord = txtRecord.wireformat
+    elif not isinstance(txtRecord, bytes):
         raise TypeError('txtRecord is unhandlable type: {type}'.format(
             type=type(txtRecord)))
 
@@ -1532,7 +1530,7 @@ def DNSServiceResolve(
             port = socket.ntohs(port)
             txtRecord = _length_and_void_p_to_byte(txtLen, txtRecord)
             callBack(sdRef, flags, interfaceIndex, errorCode, fullname.decode(),
-                     hosttarget.decode(), port, txtRecord.decode())
+                     hosttarget.decode(), port, txtRecord)
 
     _global_lock.acquire()
     try:
@@ -1936,7 +1934,7 @@ class TXTRecord(object):
 
     """
 
-    def __init__(self, items={}, strict=True):
+    def __init__(self, items=None, strict=True):
         """
 
         Create a new TXTRecord instance, initializing it with the
@@ -1947,6 +1945,8 @@ class TXTRecord(object):
         a ValueError exception.
 
         """
+        if items is None:
+            items = {}
 
         self.strict = strict
         self._names = []
@@ -1975,7 +1975,7 @@ class TXTRecord(object):
     def __str__(self):
         """
 
-        Return the wire representation of the TXT record as a string.
+        Return a representation of the TXT record as a string.
         If self.strict is false, any name/value pair whose wire length
         if greater than 255 bytes will be truncated to 255 bytes.  If
         the record is empty, '\\0' is returned.
@@ -1991,6 +1991,7 @@ class TXTRecord(object):
                 item = name
             else:
                 item = '%s=%s' % (name, value)
+
             if (not self.strict) and (len(item) > 255):
                 item = item[:255]
             parts.append(chr(len(item)))
@@ -2017,9 +2018,7 @@ class TXTRecord(object):
         """
 
         Add a name/value pair to the record.  If value is None, then
-        name will have no associated value.  If value is a unicode
-        instance, it will be encoded as a UTF-8 string.  Otherwise,
-        value will be converted to an str instance.
+        name will have no associated value.
 
         """
 
@@ -2052,6 +2051,36 @@ class TXTRecord(object):
         del self._items[name]
         self._names.remove(name)
 
+    @property
+    def wireformat(self):
+        """
+
+        Return the wire representation of the TXT record as bytes.
+        If self.strict is false, any name/value pair whose wire length
+        if greater than 255 bytes will be truncated to 255 bytes.  If
+        the record is empty, '\\0' is returned.
+
+        """
+
+        if not self:
+            return '\0'
+
+        parts = []
+        for name, value in self:
+            if value is None:
+                item = name
+            else:
+                item = '%s=%s' % (name, value)
+            # encode before len()
+            item = item.encode('utf-8')
+
+            if (not self.strict) and (len(item) > 255):
+                item = item[:255]
+            parts.append(chr(len(item)).encode('utf-8'))
+            parts.append(item)
+
+        return b''.join(parts)
+
     @classmethod
     def parse(cls, data, strict=False):
         """
@@ -2065,8 +2094,9 @@ class TXTRecord(object):
         txt = cls(strict=strict)
 
         while data:
-            length = ord(data[0])
-            item = data[1:length+1].split('=', 1)
+            length = data[0]
+            item = data[1:length+1].decode('utf-8')
+            item = item.split('=', 1)
 
             # Add the item only if the name is non-empty and there are
             # no existing items with the same name
