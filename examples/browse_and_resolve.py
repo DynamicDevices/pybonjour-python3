@@ -11,10 +11,10 @@ resolved = []
 def resolve_callback(sdRef, flags, interfaceIndex, errorCode, fullname,
                      hosttarget, port, txtRecord):
     if errorCode == pybonjour.kDNSServiceErr_NoError:
-        print 'Resolved service:'
-        print '  fullname   =', fullname
-        print '  hosttarget =', hosttarget
-        print '  port       =', port
+        print('Resolved service:')
+        print('  fullname   =', fullname)
+        print('  hosttarget =', hosttarget)
+        print('  port       =', port)
         resolved.append(True)
 
 
@@ -24,10 +24,10 @@ def browse_callback(sdRef, flags, interfaceIndex, errorCode, serviceName,
         return
 
     if not (flags & pybonjour.kDNSServiceFlagsAdd):
-        print 'Service removed'
+        print('Service removed')
         return
 
-    print 'Service added; resolving'
+    print('Service added; resolving')
 
     resolve_sdRef = pybonjour.DNSServiceResolve(0,
                                                 interfaceIndex,
@@ -40,7 +40,7 @@ def browse_callback(sdRef, flags, interfaceIndex, errorCode, serviceName,
         while not resolved:
             ready = select.select([resolve_sdRef], [], [], timeout)
             if resolve_sdRef not in ready[0]:
-                print 'Resolve timed out'
+                print('Resolve timed out')
                 break
             pybonjour.DNSServiceProcessResult(resolve_sdRef)
         else:
