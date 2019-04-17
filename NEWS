@@ -1,3 +1,19 @@
+1.1.3 (2019-04-17)
+------------------
+
+* Migrate examples to python3
+
+* Add DNSServiceGetAddrInfo
+
+
+1.1.2 (2018-05-27)
+------------------
+
+* Add ServiceNotRunning error code
+
+* Fix encoding problems with TXT Record
+
+
 1.1.1 (2008-05-08)
 ------------------
 

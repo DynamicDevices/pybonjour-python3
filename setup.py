@@ -33,7 +33,7 @@ from distutils.core import setup
 
 setup(
     name='pybonjour',
-    version='1.1.2',
+    version='1.1.3',
     author='Christopher Stawarz',
     author_email='cstawarz@csail.mit.edu',
     url='http://o2s.csail.mit.edu/o2s-wiki/pybonjour',

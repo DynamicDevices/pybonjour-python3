@@ -50,7 +50,7 @@ application callbacks) are always unicode instances.
 
 
 __author__   = 'Christopher Stawarz <cstawarz@csail.mit.edu>'
-__version__  = '1.1.1'
+__version__  = '1.1.3'
 __revision__ = int('$Revision: 6125 $'.split()[1])
 
 
