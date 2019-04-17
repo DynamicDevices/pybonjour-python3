@@ -199,6 +199,16 @@ kDNSServiceType_ANY                 = 255
 
 
 #
+# Service protocols
+#
+
+kDNSServiceProtocol_IPv4            = 0x01
+kDNSServiceProtocol_IPv6            = 0x02
+kDNSServiceProtocol_UDP             = 0x10
+kDNSServiceProtocol_TCP             = 0x20
+
+
+#
 # Error codes
 #
 
@@ -330,6 +340,10 @@ class _utf8_char_p_non_null(_utf8_char_p):
 
 _DNSServiceFlags     = ctypes.c_uint32
 _DNSServiceErrorType = ctypes.c_int32
+_DNSServiceProtocol  = ctypes.c_uint32
+
+_in_port_t           = ctypes.c_ushort
+_sa_family_t         = ctypes.c_uint8
 
 
 class DNSRecordRef(ctypes.c_void_p):
@@ -490,6 +504,40 @@ class DNSServiceRef(DNSRecordRef):
         return fd
 
 
+_sockaddr_fields = [('sa_family', _sa_family_t),
+                    ('sa_data', ctypes.c_void_p)]
+
+_sockaddr_in_fields = [('sin_family', _sa_family_t),
+                       ('sin_port', _in_port_t),
+                       ('sin_addr', ctypes.c_byte * 4),
+                       ('__pad', ctypes.c_byte * 8)]
+
+_sockaddr_in6_fields = [('sin6_family', _sa_family_t),
+                        ('sin6_port', _in_port_t),
+                        ('sin6_flowinfo', ctypes.c_uint32),
+                        ('sin6_addr', ctypes.c_byte * 16),
+                        ('sin6_scope_id', ctypes.c_uint32)]
+
+# sockaddr structs on macOS start with a len field,
+# while Linux and Windows do not
+if sys.platform == 'darwin':
+    _sockaddr_fields.insert(0, ('sa_len', ctypes.c_uint8))
+    _sockaddr_in_fields.insert(0, ('sin_len', ctypes.c_uint8))
+    _sockaddr_in6_fields.insert(0, ('sin6_len', ctypes.c_uint8))
+
+
+class sockaddr(ctypes.Structure):
+    _fields_ = _sockaddr_fields
+
+
+class sockaddr_in(ctypes.Structure):
+    _fields_ = _sockaddr_in_fields
+
+
+class sockaddr_in6(ctypes.Structure):
+    _fields_ = _sockaddr_in6_fields
+
+
 _DNSServiceDomainEnumReply = _CFunc(
     None,
     DNSServiceRef,		# sdRef
@@ -562,6 +610,19 @@ _DNSServiceQueryRecordReply = _CFunc(
     ctypes.c_uint16,		# rrclass
     ctypes.c_uint16,		# rdlen
     ctypes.c_void_p,		# rdata
+    ctypes.c_uint32,		# ttl
+    ctypes.c_void_p,		# context
+    )
+
+
+_DNSServiceGetAddrInfoReply = _CFunc(
+    None,
+    DNSServiceRef,		# sdRef
+    _DNSServiceFlags,		# flags
+    ctypes.c_uint32,		# interfaceIndex
+    _DNSServiceErrorType,	# errorCode
+    _utf8_char_p,		# hostname
+    ctypes.POINTER(sockaddr),	# address
     ctypes.c_uint32,		# ttl
     ctypes.c_void_p,		# context
     )
@@ -772,6 +833,21 @@ def _create_function_bindings():
                 ctypes.c_uint16,		# rrclass
                 _DNSServiceQueryRecordReply,	# callBack
                 ctypes.c_void_p,		# context
+                )),
+
+        'DNSServiceGetAddrInfo':
+        (
+            _DNSServiceErrorType,
+            ERRCHECK,
+            OUTPARAM(0),
+            (
+                ctypes.POINTER(DNSServiceRef), # sdRef
+                _DNSServiceFlags,              # flags
+                ctypes.c_uint32,               # interfaceIndex
+                _DNSServiceProtocol,           # protocol
+                _utf8_char_p_non_null,         # hostname
+                _DNSServiceGetAddrInfoReply,   # callBack
+                ctypes.c_void_p,               # context
                 )),
 
         'DNSServiceReconfirmRecord':
@@ -1792,6 +1868,120 @@ def DNSServiceQueryRecord(
                                        fullname,
                                        rrtype,
                                        rrclass,
+                                       _callback,
+                                       None)
+    finally:
+        _global_lock.release()
+
+    sdRef._add_callback(_callback)
+
+    return sdRef
+
+
+def DNSServiceGetAddrInfo(
+    flags = 0,
+    interfaceIndex = kDNSServiceInterfaceIndexAny,
+    protocol = (kDNSServiceProtocol_IPv4|kDNSServiceProtocol_IPv6),
+    hostname = _NO_DEFAULT,
+    callBack = None,
+    ):
+
+    """
+
+    Queries for the IP address of a hostname by using either Multicast or Unicast DNS.
+
+      flags:
+        Pass kDNSServiceFlagsLongLivedQuery to create a "long-lived"
+        unicast query in a non-local domain.  Without setting this
+        flag, unicast queries will be one-shot; that is, only answers
+        available at the time of the call will be returned.  By
+        setting this flag, answers (including Add and Remove events)
+        that become available after the initial call is made will
+        generate callbacks.  This flag has no effect on link-local
+        multicast queries.
+
+      interfaceIndex:
+        If non-zero, specifies the interface on which to issue the
+        query.  Passing kDNSServiceInterfaceIndexAny (0) causes the
+        name to be queried for on all interfaces.
+
+      protocol:
+        Pass kDNSServiceProtocol_IPv4 to look up IPv4 addresses,
+        or kDNSServiceProtocol_IPv6 to look up IPv6 addresses,
+        or both to look up both kinds.
+
+      hostname:
+        The full domain name of the resource record to be queried for.
+
+      callBack:
+        The function to be called when a result is found, or if the
+        call asynchronously fails.  Its signature should be
+        callBack(sdRef, flags, interfaceIndex, errorCode,
+                  hostname, address_p, ttl, context).
+
+      return value:
+        A DNSServiceRef instance.  The query operation will run
+        indefinitely until the client terminates it by closing the
+        DNSServiceRef.
+
+    Callback Parameters:
+
+      sdRef:
+        The DNSServiceRef returned by DNSServiceGetAddrInfo().
+
+      flags:
+        Possible values are kDNSServiceFlagsMoreComing and
+        kDNSServiceFlagsAdd.
+
+      interfaceIndex:
+        The interface on which the query was resolved.
+
+      errorCode:
+        Will be kDNSServiceErr_NoError on success, otherwise will
+        indicate the failure that occurred.  Other parameters are
+        undefined if an error occurred.
+
+      hostname:
+        The resource record's full domain name.
+
+      address:
+        A two-tuple containing the address family
+        (socket.AF_INET or socket.AF_INET6) and the address string.
+
+      ttl:
+        The resource record's time to live, in seconds.
+
+    """
+
+    _NO_DEFAULT.check(hostname)
+
+    @_DNSServiceGetAddrInfoReply
+    def _callback(sdRef, flags, interfaceIndex, errorCode,
+                  hostname, address_p, ttl, context):
+        if callBack is not None:
+            address_s = address_p.contents
+            fam = socket.AddressFamily(address_s.sa_family)
+            if fam == socket.AF_INET:
+                sa = ctypes.cast(address_p, ctypes.POINTER(sockaddr_in)).contents
+                in_addr = sa.sin_addr
+            elif fam == socket.AF_INET6:
+                sa = ctypes.cast(address_p, ctypes.POINTER(sockaddr_in6)).contents
+                in_addr = sa.sin6_addr
+            else:
+                in_addr = None
+            if in_addr is None:
+                address = None
+            else:
+                address = (fam, socket.inet_ntop(fam, in_addr))
+            callBack(sdRef, flags, interfaceIndex, errorCode,
+                     hostname.decode(), address, ttl)
+
+    _global_lock.acquire()
+    try:
+        sdRef = _DNSServiceGetAddrInfo(flags,
+                                       interfaceIndex,
+                                       protocol,
+                                       hostname,
                                        _callback,
                                        None)
     finally:
